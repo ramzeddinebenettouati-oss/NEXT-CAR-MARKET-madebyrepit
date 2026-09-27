@@ -1,0 +1,5457 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: AutoCango Vehicle Marketplace API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User management operations
+  - name: vehicles
+    description: Vehicle listing operations
+  - name: seller
+    description: Seller dashboard operations
+  - name: reference
+    description: Reference data
+  - name: buyer
+    description: Buyer portal operations (favorites, dashboard, notifications)
+  - name: chat
+    description: Chat and messaging operations
+  - name: quotations
+    description: Quotation management operations
+  - name: orders
+    description: Order lifecycle management operations
+  - name: payments
+    description: SWIFT payment submission and verification
+  - name: storage
+    description: Object storage upload and serving endpoints
+  - name: freight
+    description: Freight forwarder portal — freight requests, shipping quotes, forwarder chat
+  - name: shipments
+    description: Shipment lifecycle tracking and document management
+  - name: admin
+    description: Admin and Super Admin portal operations
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshInput"
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "401":
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /auth/phone/request-otp:
+    post:
+      operationId: requestPhoneOtp
+      tags: [auth]
+      summary: Request a 6-digit OTP via SMS for phone sign-in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhoneOtpRequestInput"
+      responses:
+        "200":
+          description: OTP sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneOtpRequestResponse"
+        "400":
+          description: Invalid phone number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "429":
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /auth/phone/verify:
+    post:
+      operationId: verifyPhoneOtp
+      tags: [auth]
+      summary: Verify OTP and sign in or return a phoneToken for new users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhoneOtpVerifyInput"
+      responses:
+        "200":
+          description: OTP valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneOtpVerifyResponse"
+        "400":
+          description: Invalid or expired OTP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /auth/phone/complete:
+    post:
+      operationId: completePhoneProfile
+      tags: [auth]
+      summary: Complete registration for a new phone-verified user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhoneOtpCompleteInput"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error or invalid phoneToken
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    patch:
+      operationId: updateCurrentUser
+      tags: [auth]
+      summary: Update current user's profile (name, country, language preference)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileInput"
+      responses:
+        "200":
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /auth/user:
+    get:
+      tags: [auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user (session-based)
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+
+  /login:
+    get:
+      tags: [auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the OIDC authorization endpoint.
+
+  /callback:
+    get:
+      tags: [auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: iss
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+      responses:
+        '302':
+          description: Redirect to the returnTo path on success or /api/login on failure.
+
+  /logout:
+    get:
+      tags: [auth]
+      operationId: logoutBrowserSession
+      summary: Clear the session and begin OIDC logout
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to the OIDC provider logout URL.
+
+  /mobile-auth/token-exchange:
+    post:
+      tags: [auth]
+      operationId: exchangeMobileAuthorizationCode
+      summary: Exchange a mobile OIDC code for a session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MobileTokenExchangeRequest'
+      responses:
+        '200':
+          description: Session created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileTokenExchangeSuccess'
+        '400':
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Token exchange failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /mobile-auth/logout:
+    post:
+      tags: [auth]
+      operationId: logoutMobileSession
+      summary: Delete a mobile session token
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+      responses:
+        '200':
+          description: Logout processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [super_admin, admin, seller, buyer, freight_forwarder]
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+
+  /users/{userId}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a user by ID (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /users/{userId}/suspend:
+    post:
+      operationId: suspendUser
+      tags: [users]
+      summary: Suspend or activate a user (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SuspendUserInput"
+      responses:
+        "200":
+          description: User status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /reference/countries:
+    get:
+      operationId: listCountries
+      tags: [reference]
+      summary: List all active countries
+      responses:
+        "200":
+          description: Countries list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Country"
+
+  /reference/ports:
+    get:
+      operationId: listPorts
+      tags: [reference]
+      summary: List all active ports
+      responses:
+        "200":
+          description: Ports list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Port"
+
+  /reference/currencies:
+    get:
+      operationId: listCurrencies
+      tags: [reference]
+      summary: List all active currencies
+      responses:
+        "200":
+          description: Currencies list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Currency"
+
+  /reference/brands:
+    get:
+      operationId: listVehicleBrands
+      tags: [reference]
+      summary: List vehicle brands
+      responses:
+        "200":
+          description: Brands list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VehicleBrand"
+
+  /reference/models:
+    get:
+      operationId: listVehicleModels
+      tags: [reference]
+      summary: List vehicle models, optionally filtered by brand
+      parameters:
+        - name: brandId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Models list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VehicleModel"
+
+  /vehicles:
+    get:
+      operationId: listVehicles
+      tags: [vehicles]
+      summary: List/search published vehicle listings
+      parameters:
+        - name: brandId
+          in: query
+          schema:
+            type: string
+        - name: brandName
+          in: query
+          schema:
+            type: string
+        - name: modelName
+          in: query
+          schema:
+            type: string
+        - name: fuelType
+          in: query
+          schema:
+            type: string
+            enum: [petrol, diesel, electric, hybrid, phev, hydrogen, lpg, other]
+        - name: condition
+          in: query
+          schema:
+            type: string
+            enum: [new, used, certified_used]
+        - name: yearMin
+          in: query
+          schema:
+            type: integer
+        - name: yearMax
+          in: query
+          schema:
+            type: integer
+        - name: priceMin
+          in: query
+          schema:
+            type: number
+        - name: priceMax
+          in: query
+          schema:
+            type: number
+        - name: sellerId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, pending_review, published, rejected, archived]
+        - name: exteriorColor
+          in: query
+          description: Filter by exterior color (partial match)
+          schema:
+            type: string
+        - name: evOnly
+          in: query
+          description: If true, show only electric/hybrid/PHEV vehicles
+          schema:
+            type: boolean
+        - name: inStock
+          in: query
+          description: If true, only show listings with quantity > 0
+          schema:
+            type: boolean
+        - name: originPortId
+          in: query
+          description: Filter by origin port UUID
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest, price_asc, price_desc, popular]
+            default: newest
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Vehicle listings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleListResponse"
+
+    post:
+      operationId: createVehicle
+      tags: [vehicles]
+      summary: Create a vehicle listing (seller only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVehicleInput"
+      responses:
+        "201":
+          description: Vehicle created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleDetail"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /vehicles/{vehicleId}:
+    get:
+      operationId: getVehicle
+      tags: [vehicles]
+      summary: Get vehicle detail
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vehicle detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+    patch:
+      operationId: updateVehicle
+      tags: [vehicles]
+      summary: Update a vehicle listing (seller who owns it or admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVehicleInput"
+      responses:
+        "200":
+          description: Vehicle updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleDetail"
+
+    delete:
+      operationId: deleteVehicle
+      tags: [vehicles]
+      summary: Delete a vehicle listing
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /vehicles/{vehicleId}/submit:
+    post:
+      operationId: submitVehicleForReview
+      tags: [vehicles]
+      summary: Submit a draft listing for admin review
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleDetail"
+
+  /vehicles/images/request-upload:
+    post:
+      operationId: requestVehicleImageUpload
+      tags: [vehicles]
+      summary: Request a seller-scoped App Storage URL for a vehicle image
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Unsupported image metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /vehicles/{vehicleId}/images/attach:
+    post:
+      operationId: attachVehicleImage
+      tags: [vehicles]
+      summary: Attach an App Storage image to a vehicle listing
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachVehicleImageInput"
+      responses:
+        "201":
+          description: Image attached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleImage"
+
+  /vehicles/{vehicleId}/images/{imageId}:
+    delete:
+      operationId: deleteVehicleImage
+      tags: [vehicles]
+      summary: Delete a vehicle image
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /vehicles/{vehicleId}/videos:
+    post:
+      operationId: addVehicleVideo
+      tags: [vehicles]
+      summary: Add a video to a vehicle listing (file upload or external URL)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                url:
+                  type: string
+                  description: External video URL (YouTube, Vimeo, etc.) if not uploading a file
+                title:
+                  type: string
+      responses:
+        "201":
+          description: Video added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleVideo"
+
+  /vehicles/{vehicleId}/videos/{videoId}:
+    delete:
+      operationId: deleteVehicleVideo
+      tags: [vehicles]
+      summary: Delete a vehicle video
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /seller/dashboard:
+    get:
+      operationId: getSellerDashboard
+      tags: [seller]
+      summary: Get seller dashboard statistics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SellerDashboard"
+
+  /seller/listings:
+    get:
+      operationId: listSellerListings
+      tags: [seller]
+      summary: List seller's own vehicle listings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, pending_review, published, rejected, archived]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Seller listings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleListResponse"
+
+  # ── Favorites ──────────────────────────────────────────────────────────────
+
+  /favorites:
+    get:
+      operationId: listFavorites
+      tags: [buyer]
+      summary: List the authenticated buyer's favorite vehicles
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Favorites list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FavoritesListResponse"
+
+  /favorites/{vehicleId}:
+    post:
+      operationId: toggleFavorite
+      tags: [buyer]
+      summary: Toggle a vehicle in/out of favorites
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Toggle result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToggleFavoriteResponse"
+
+  # ── Conversations ─────────────────────────────────────────────────────────
+
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [chat]
+      summary: List conversations for the current user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Conversations list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationListResponse"
+
+    post:
+      operationId: createConversation
+      tags: [chat]
+      summary: Start a new conversation with a seller about a vehicle
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateConversationInput"
+      responses:
+        "201":
+          description: Conversation created or existing one returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetail"
+
+  /conversations/{conversationId}:
+    get:
+      operationId: getConversation
+      tags: [chat]
+      summary: Get conversation detail with message history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Conversation with messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /conversations/{conversationId}/messages:
+    post:
+      operationId: sendMessage
+      tags: [chat]
+      summary: Send a message in a conversation (with optional attachment)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                body:
+                  type: string
+                  description: Message text
+                file:
+                  type: string
+                  format: binary
+                  description: Optional file attachment
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+
+  /conversations/{conversationId}/quotations:
+    post:
+      operationId: sendConversationQuotation
+      tags: [chat]
+      summary: Seller sends a quotation from within a conversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendConversationQuotationInput"
+      responses:
+        "201":
+          description: Quotation message created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /conversations/{conversationId}/read:
+    post:
+      operationId: markConversationRead
+      tags: [chat]
+      summary: Mark all messages in a conversation as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ── Notifications ─────────────────────────────────────────────────────────
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [buyer]
+      summary: List notifications for the current user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Notifications list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [buyer]
+      summary: Mark all notifications as read
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Marked all read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /notifications/{notificationId}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [buyer]
+      summary: Mark a notification as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ── Buyer Dashboard ───────────────────────────────────────────────────────
+
+  /buyer/dashboard:
+    get:
+      operationId: getBuyerDashboard
+      tags: [buyer]
+      summary: Get buyer dashboard summary
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Buyer dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuyerDashboard"
+
+  # ── Quotations ────────────────────────────────────────────────────────────
+
+  /quotations:
+    post:
+      operationId: createQuotation
+      tags: [quotations]
+      summary: Create a quotation (seller only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQuotationInput"
+      responses:
+        "201":
+          description: Quotation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationSummary"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    get:
+      operationId: listQuotations
+      tags: [quotations]
+      summary: List quotations (role-scoped)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/QuotationStatus"
+        - name: commissionType
+          in: query
+          schema:
+            type: string
+        - name: commissionRuleId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: minCommission
+          in: query
+          schema:
+            type: number
+        - name: maxCommission
+          in: query
+          schema:
+            type: number
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Quotations list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationListResponse"
+
+  /quotations/{quotationId}:
+    get:
+      operationId: getQuotation
+      tags: [quotations]
+      summary: Get quotation detail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quotation detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationSummary"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /quotations/{quotationId}/accept:
+    post:
+      operationId: acceptQuotation
+      tags: [quotations]
+      summary: Buyer accepts a quotation (auto-creates order)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Quotation accepted, order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderSummary"
+        "400":
+          description: Quotation not in acceptable state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /quotations/{quotationId}/reject:
+    post:
+      operationId: rejectQuotation
+      tags: [quotations]
+      summary: Buyer rejects a quotation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: quotationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quotation rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotationSummary"
+        "400":
+          description: Quotation not in rejectable state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Orders ────────────────────────────────────────────────────────────────
+
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: List orders (role-scoped)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/OrderStatus"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: buyerName
+          in: query
+          schema:
+            type: string
+        - name: sellerName
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest, highest, lowest]
+            default: newest
+        - name: commissionType
+          in: query
+          schema:
+            type: string
+        - name: commissionRuleId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: minCommission
+          in: query
+          schema:
+            type: number
+        - name: maxCommission
+          in: query
+          schema:
+            type: number
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Orders list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderListResponse"
+
+  /orders/{orderId}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get order detail with status history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /orders/{orderId}/status:
+    patch:
+      operationId: updateOrderStatus
+      tags: [orders]
+      summary: Update order status (seller or admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderStatusInput"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+        "400":
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Storage ───────────────────────────────────────────────────────────────
+
+  /storage/uploads/request-url:
+    post:
+      tags: [storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Missing or invalid fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /storage/objects/{objectPath}:
+    get:
+      tags: [storage]
+      operationId: getStorageObject
+      summary: Serve an object entity
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Binary object content
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Payments ──────────────────────────────────────────────────────────────
+
+  /orders/{orderId}/payments:
+    post:
+      operationId: submitPayment
+      tags: [payments]
+      summary: Buyer submits SWIFT payment proof for an awaiting-payment order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitPaymentInput"
+      responses:
+        "201":
+          description: Payment submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentRecord"
+        "400":
+          description: Validation error or order not awaiting payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    get:
+      operationId: getOrderPayment
+      tags: [payments]
+      summary: Get payment record for an order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentRecord"
+        "404":
+          description: No payment found for this order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /payments:
+    get:
+      operationId: listPayments
+      tags: [payments]
+      summary: List all payments (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PaymentStatus"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Payments list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentListResponse"
+
+  /payments/{paymentId}/verify:
+    post:
+      operationId: verifyPayment
+      tags: [payments]
+      summary: Admin verifies a payment — advances order to payment_verified
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentActionInput"
+      responses:
+        "200":
+          description: Payment verified, order advanced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentRecord"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /payments/{paymentId}/reject:
+    post:
+      operationId: rejectPayment
+      tags: [payments]
+      summary: Admin rejects a payment — resets order to awaiting_payment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentActionInput"
+      responses:
+        "200":
+          description: Payment rejected, order reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentRecord"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Freight Forwarder ────────────────────────────────────────────────────────
+
+  /freight-requests:
+    get:
+      operationId: listFreightRequests
+      tags: [freight]
+      summary: List freight requests (forwarders see open; admins see all; sellers see their own)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/FreightRequestStatus"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Freight requests list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreightRequestListResponse"
+
+  /freight-requests/{requestId}:
+    get:
+      operationId: getFreightRequest
+      tags: [freight]
+      summary: Get a freight request detail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Freight request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreightRequest"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /freight-requests/{requestId}/quotes:
+    get:
+      operationId: listFreightRequestQuotes
+      tags: [freight]
+      summary: List shipping quotes for a freight request (forwarder sees own; admin/seller see all)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Shipping quotes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShippingQuoteListResponse"
+
+    post:
+      operationId: submitShippingQuote
+      tags: [freight]
+      summary: Freight forwarder submits a shipping quote
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitShippingQuoteInput"
+      responses:
+        "201":
+          description: Quote submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShippingQuote"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /orders/{orderId}/shipping-quotes:
+    get:
+      operationId: listOrderShippingQuotes
+      tags: [freight]
+      summary: List all shipping quotes for an order (buyer/seller/admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shipping quotes for order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShippingQuoteListResponse"
+
+  /shipping-quotes/{quoteId}:
+    get:
+      operationId: getShippingQuote
+      tags: [freight]
+      summary: Get a shipping quote by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shipping quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShippingQuote"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /shipping-quotes/{quoteId}/accept:
+    post:
+      operationId: acceptShippingQuote
+      tags: [freight]
+      summary: Buyer accepts a shipping quote
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quote accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShippingQuote"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /shipping-quotes/{quoteId}/reject:
+    post:
+      operationId: rejectShippingQuote
+      tags: [freight]
+      summary: Buyer rejects a shipping quote
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectShippingQuoteInput"
+      responses:
+        "200":
+          description: Quote rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShippingQuote"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Freight Chat (Seller ↔ FreightForwarder) ─────────────────────────────────
+
+  /freight-conversations:
+    get:
+      operationId: listFreightConversations
+      tags: [freight]
+      summary: List freight conversations for the current user (seller or forwarder)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Freight conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FreightConversation"
+
+    post:
+      operationId: createFreightConversation
+      tags: [freight]
+      summary: Start a freight conversation between seller and forwarder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFreightConversationInput"
+      responses:
+        "201":
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreightConversation"
+
+  /freight-conversations/{conversationId}:
+    get:
+      operationId: getFreightConversation
+      tags: [freight]
+      summary: Get freight conversation detail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreightConversation"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /freight-conversations/{conversationId}/messages:
+    get:
+      operationId: listFreightMessages
+      tags: [freight]
+      summary: List messages in a freight conversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreightMessageListResponse"
+
+    post:
+      operationId: sendFreightMessage
+      tags: [freight]
+      summary: Send a message in a freight conversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendFreightMessageBody"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreightMessage"
+
+  /shipments:
+    get:
+      operationId: listShipments
+      tags: [shipments]
+      summary: List shipments (role-scoped)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ShipmentStatus"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Shipments list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShipmentListResponse"
+
+  /shipments/{shipmentId}:
+    get:
+      operationId: getShipment
+      tags: [shipments]
+      summary: Get shipment detail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shipmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shipment detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShipmentDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /shipments/{shipmentId}/status:
+    patch:
+      operationId: updateShipmentStatus
+      tags: [shipments]
+      summary: Update shipment status (forwarder only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shipmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateShipmentStatusInput"
+      responses:
+        "200":
+          description: Shipment updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShipmentDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /shipments/{shipmentId}/tracking:
+    get:
+      operationId: listShipmentTracking
+      tags: [shipments]
+      summary: Get shipment tracking event log
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shipmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tracking events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShipmentTrackingListResponse"
+
+  /shipments/{shipmentId}/documents:
+    get:
+      operationId: listShipmentDocuments
+      tags: [shipments]
+      summary: List documents for a shipment (role-filtered)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shipmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShipmentDocument"
+
+    post:
+      operationId: uploadShipmentDocument
+      tags: [shipments]
+      summary: Upload a shipping document (forwarder only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shipmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadShipmentDocumentInput"
+      responses:
+        "201":
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShipmentDocument"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /shipments/{shipmentId}/documents/{documentId}:
+    delete:
+      operationId: deleteShipmentDocument
+      tags: [shipments]
+      summary: Delete a shipping document (forwarder/admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: shipmentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /orders/{orderId}/shipment:
+    get:
+      operationId: getOrderShipment
+      tags: [shipments]
+      summary: Get shipment for an order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shipment detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShipmentDetail"
+        "404":
+          description: No shipment yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Admin / Super Admin ───────────────────────────────────────────────────
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Get platform-wide analytics stats (super admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Aggregated platform stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /admin/admins:
+    get:
+      operationId: listAdmins
+      tags: [admin]
+      summary: List all admin users (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Admin users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminListResponse"
+    post:
+      operationId: createAdmin
+      tags: [admin]
+      summary: Create a new admin user (super admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAdminInput"
+      responses:
+        "201":
+          description: Admin created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /admin/admins/{adminId}/permissions:
+    patch:
+      operationId: updateAdminPermissions
+      tags: [admin]
+      summary: Update an admin's role/permissions (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: adminId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAdminPermissionsInput"
+      responses:
+        "200":
+          description: Permissions updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /commission-rules:
+    get:
+      operationId: listCommissionRules
+      tags: [admin]
+      summary: List commission rules (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [default, seller, country, category]
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Commission rules
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommissionRuleListResponse"
+    post:
+      operationId: createCommissionRule
+      tags: [admin]
+      summary: Create a commission rule (super admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommissionRuleInput"
+      responses:
+        "201":
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommissionRule"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /commission-rules/{ruleId}:
+    patch:
+      operationId: updateCommissionRule
+      tags: [admin]
+      summary: Update a commission rule (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCommissionRuleInput"
+      responses:
+        "200":
+          description: Rule updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommissionRule"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      operationId: deleteCommissionRule
+      tags: [admin]
+      summary: Delete a commission rule (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [admin]
+      summary: List audit logs (admin only — filterable)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: module
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListResponse"
+
+  /settings:
+    get:
+      operationId: getPlatformSettings
+      tags: [admin]
+      summary: Get all platform settings (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SettingEntry"
+
+  /settings/{key}:
+    put:
+      operationId: updatePlatformSetting
+      tags: [admin]
+      summary: Update a platform setting value (super admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingUpdateInput"
+      responses:
+        "200":
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingEntry"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /vehicles/{vehicleId}/approve:
+    post:
+      operationId: approveVehicle
+      tags: [admin]
+      summary: Approve a pending vehicle listing (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveVehicleInput"
+      responses:
+        "200":
+          description: Vehicle approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /vehicles/{vehicleId}/reject:
+    post:
+      operationId: rejectVehicle
+      tags: [admin]
+      summary: Reject a pending vehicle listing (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectVehicleInput"
+      responses:
+        "200":
+          description: Vehicle rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleDetail"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /admin/vehicles/{vehicleId}/commission:
+    patch:
+      operationId: assignVehicleCommission
+      tags: [admin]
+      summary: Assign a commission rule to a vehicle listing (requires commission_assignment permission)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ruleId]
+              properties:
+                ruleId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Commission assigned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  commissionRuleId: { type: string, format: uuid, nullable: true }
+                  commissionType: { type: string, nullable: true }
+                  commissionValue: { type: number, nullable: true }
+                  commissionSnapshot: { type: object, nullable: true }
+                  updatedAt: { type: string, format: date-time }
+        "400":
+          description: Missing or invalid ruleId
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "403":
+          description: commission_assignment permission required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "404":
+          description: Vehicle or commission rule not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /admin/moderation-queue:
+    get:
+      operationId: getModerationQueue
+      tags: [admin]
+      summary: Get vehicles pending moderation — New Listed Vehicles (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Pending vehicles with commission fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationQueueResponse"
+
+  /admin/me/permissions:
+    get:
+      operationId: getAdminMyPermissions
+      tags: [admin]
+      summary: Get current admin's effective permissions
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Permission list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [permissions]
+                properties:
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+
+  /admin/users/{userId}/status:
+    patch:
+      operationId: updateAdminUserStatus
+      tags: [admin]
+      summary: Activate or suspend a user account (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isActive]
+              properties:
+                isActive: { type: boolean }
+                reason: { type: string }
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /admin/users/{userId}:
+    delete:
+      operationId: deleteAdminUser
+      tags: [admin]
+      summary: Anonymise and soft-delete a user (super_admin role required)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Deletion confirmation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /admin/reference/countries:
+    get:
+      operationId: listAdminCountries
+      tags: [admin]
+      summary: List reference countries
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Country list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReferenceCountry"
+    post:
+      operationId: createAdminCountry
+      tags: [admin]
+      summary: Create a reference country (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, code]
+              properties:
+                name: { type: string }
+                code: { type: string }
+                isActive: { type: boolean }
+      responses:
+        "201":
+          description: Created country
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferenceCountry"
+
+  /admin/reference/countries/{id}:
+    patch:
+      operationId: updateAdminCountry
+      tags: [admin]
+      summary: Update a reference country (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                code: { type: string }
+                isActive: { type: boolean }
+      responses:
+        "200":
+          description: Updated country
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferenceCountry"
+    delete:
+      operationId: deleteAdminCountry
+      tags: [admin]
+      summary: Delete a reference country (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /admin/reference/ports:
+    get:
+      operationId: listAdminPorts
+      tags: [admin]
+      summary: List reference ports
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Port list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReferencePort"
+    post:
+      operationId: createAdminPort
+      tags: [admin]
+      summary: Create a reference port (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, code, countryId]
+              properties:
+                name: { type: string }
+                code: { type: string }
+                countryId: { type: string }
+                isActive: { type: boolean }
+      responses:
+        "201":
+          description: Created port
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferencePort"
+
+  /admin/reference/ports/{id}:
+    patch:
+      operationId: updateAdminPort
+      tags: [admin]
+      summary: Update a reference port (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                code: { type: string }
+                countryId: { type: string }
+                isActive: { type: boolean }
+      responses:
+        "200":
+          description: Updated port
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferencePort"
+    delete:
+      operationId: deleteAdminPort
+      tags: [admin]
+      summary: Delete a reference port (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /admin/reference/currencies:
+    get:
+      operationId: listAdminCurrencies
+      tags: [admin]
+      summary: List reference currencies
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Currency list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReferenceCurrency"
+    post:
+      operationId: createAdminCurrency
+      tags: [admin]
+      summary: Create a reference currency (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, code, symbol]
+              properties:
+                name: { type: string }
+                code: { type: string }
+                symbol: { type: string }
+                isActive: { type: boolean }
+      responses:
+        "201":
+          description: Created currency
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferenceCurrency"
+
+  /admin/reference/currencies/{id}:
+    patch:
+      operationId: updateAdminCurrency
+      tags: [admin]
+      summary: Update a reference currency (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                code: { type: string }
+                symbol: { type: string }
+                isActive: { type: boolean }
+      responses:
+        "200":
+          description: Updated currency
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferenceCurrency"
+    delete:
+      operationId: deleteAdminCurrency
+      tags: [admin]
+      summary: Delete a reference currency (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      description: Opaque session token — `Bearer <sid>`.
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      description: Browser session cookie.
+      schema:
+        type: string
+
+  schemas:
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: [string, 'null']
+          format: email
+        firstName:
+          type: [string, 'null']
+        lastName:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+    MobileTokenExchangeRequest:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        code_verifier:
+          type: string
+          minLength: 1
+        redirect_uri:
+          type: string
+          minLength: 1
+          format: uri
+        state:
+          type: string
+          minLength: 1
+        nonce:
+          type: string
+          minLength: 1
+    MobileTokenExchangeSuccess:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    LogoutSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          const: true
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    RegisterInput:
+      type: object
+      required: [email, password, role, firstName, lastName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        role:
+          type: string
+          enum: [seller, buyer]
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: ["string", "null"]
+        country:
+          type: ["string", "null"]
+        companyName:
+          type: ["string", "null"]
+        signupMethod:
+          type: string
+          enum: [email, phone, google, wechat]
+          default: email
+
+    PhoneOtpRequestInput:
+      type: object
+      required: [phone]
+      properties:
+        phone:
+          type: string
+          description: E.164 phone number e.g. +8613800138000
+
+    PhoneOtpRequestResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        devOtp:
+          type: string
+          description: Only present in dev mode when Twilio is not configured
+
+    PhoneOtpVerifyInput:
+      type: object
+      required: [phone, otp]
+      properties:
+        phone:
+          type: string
+        otp:
+          type: string
+          minLength: 6
+          maxLength: 6
+
+    PhoneOtpVerifyResponse:
+      type: object
+      required: [needsProfile]
+      properties:
+        needsProfile:
+          type: boolean
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        phoneToken:
+          type: string
+          description: Short-lived token for profile completion (new users only)
+
+    PhoneOtpCompleteInput:
+      type: object
+      required: [phoneToken, role, firstName, lastName, companyName]
+      properties:
+        phoneToken:
+          type: string
+        role:
+          type: string
+          enum: [buyer, seller]
+        firstName:
+          type: string
+        lastName:
+          type: string
+        companyName:
+          type: string
+        email:
+          type: ["string", "null"]
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    RefreshInput:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    TokenPair:
+      type: object
+      required: [accessToken, refreshToken]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [accessToken, refreshToken, user]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+
+    UserProfile:
+      type: object
+      required: [id, email, role, firstName, lastName, isActive, createdAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, admin, seller, buyer, freight_forwarder]
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: ["string", "null"]
+        country:
+          type: ["string", "null"]
+        signupMethod:
+          type: string
+          enum: [email, phone, google, wechat]
+        preferredLanguage:
+          type: ["string", "null"]
+          description: BCP-47 language code e.g. en, zh, ar
+        isActive:
+          type: boolean
+        isEmailVerified:
+          type: boolean
+        lastLoginAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    UpdateProfileInput:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        country:
+          type: ["string", "null"]
+        preferredLanguage:
+          type: ["string", "null"]
+          description: BCP-47 language code e.g. en, zh, ar
+
+    UserUpdate:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: ["string", "null"]
+        country:
+          type: ["string", "null"]
+
+    SuspendUserInput:
+      type: object
+      required: [isActive]
+      properties:
+        isActive:
+          type: boolean
+        reason:
+          type: ["string", "null"]
+
+    UserListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserProfile"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    Country:
+      type: object
+      required: [id, name, code]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        region:
+          type: ["string", "null"]
+
+    Port:
+      type: object
+      required: [id, name, code]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        city:
+          type: ["string", "null"]
+        portType:
+          type: ["string", "null"]
+
+    Currency:
+      type: object
+      required: [id, name, code, symbol]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        symbol:
+          type: string
+
+    VehicleBrand:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        countryOfOrigin:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+
+    VehicleModel:
+      type: object
+      required: [id, brandId, name]
+      properties:
+        id:
+          type: string
+        brandId:
+          type: string
+        name:
+          type: string
+
+    VehicleImage:
+      type: object
+      required: [id, vehicleId, url, displayOrder, isPrimary]
+      properties:
+        id:
+          type: string
+        vehicleId:
+          type: string
+        url:
+          type: string
+        displayOrder:
+          type: integer
+        isPrimary:
+          type: boolean
+
+    AttachVehicleImageInput:
+      type: object
+      required: [objectPath]
+      properties:
+        objectPath:
+          type: string
+          description: App Storage object path returned by the upload URL endpoint
+        isPrimary:
+          type: boolean
+          default: false
+
+    VehicleVideo:
+      type: object
+      required: [id, vehicleId, url]
+      properties:
+        id:
+          type: string
+        vehicleId:
+          type: string
+        url:
+          type: string
+        title:
+          type: ["string", "null"]
+
+    AddVehicleVideoInput:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+        title:
+          type: string
+
+    VehicleSummary:
+      type: object
+      required: [id, brandName, modelName, year, fuelType, condition, status, createdAt]
+      properties:
+        id:
+          type: string
+        brandName:
+          type: string
+        modelName:
+          type: string
+        trim:
+          type: ["string", "null"]
+        year:
+          type: integer
+        fuelType:
+          type: string
+          enum: [petrol, diesel, electric, hybrid, phev, hydrogen, lpg, other]
+        condition:
+          type: string
+          enum: [new, used, certified_used]
+        exteriorColor:
+          type: ["string", "null"]
+        mileageKm:
+          type: integer
+        displayPriceUsd:
+          type: ["number", "null"]
+          description: "Final buyer-facing price (FOB + platform commission). Always use this for display; never expose fobPriceUsd to buyers."
+        fobPriceUsd:
+          type: ["string", "null"]
+          description: "Raw seller FOB price. Only included for seller-own and admin views; absent from public buyer responses."
+        quantity:
+          type: integer
+        status:
+          type: string
+          enum: [draft, pending_review, published, rejected, archived]
+        primaryImageUrl:
+          type: ["string", "null"]
+        viewCount:
+          type: integer
+        sellerId:
+          type: string
+        sellerName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    VehicleDetail:
+      allOf:
+        - $ref: "#/components/schemas/VehicleSummary"
+        - type: object
+          properties:
+            brandId:
+              type: ["string", "null"]
+            modelId:
+              type: ["string", "null"]
+            transmission:
+              type: ["string", "null"]
+              enum: [manual, automatic, cvt, dct, other, null]
+            driveType:
+              type: ["string", "null"]
+              enum: [fwd, rwd, awd, 4wd, null]
+            engineSizeL:
+              type: ["string", "null"]
+            batteryCapacityKwh:
+              type: ["string", "null"]
+            rangeKm:
+              type: ["integer", "null"]
+            interiorColor:
+              type: ["string", "null"]
+            vin:
+              type: ["string", "null"]
+            originPortId:
+              type: ["string", "null"]
+            description:
+              type: ["string", "null"]
+            notes:
+              type: ["string", "null"]
+            rejectionReason:
+              type: ["string", "null"]
+            images:
+              type: array
+              items:
+                $ref: "#/components/schemas/VehicleImage"
+            videos:
+              type: array
+              items:
+                $ref: "#/components/schemas/VehicleVideo"
+            updatedAt:
+              type: string
+
+    ModerationQueueResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/VehicleSummary"
+              - type: object
+                properties:
+                  commissionRuleId:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  commissionType:
+                    type: string
+                    nullable: true
+                  commissionValue:
+                    type: number
+                    nullable: true
+                  commissionSnapshot:
+                    type: object
+                    nullable: true
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    VehicleListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/VehicleSummary"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreateVehicleInput:
+      type: object
+      required: [brandName, modelName, year, fuelType, fobPriceUsd]
+      properties:
+        brandId:
+          type: ["string", "null"]
+        brandName:
+          type: string
+        modelId:
+          type: ["string", "null"]
+        modelName:
+          type: string
+        trim:
+          type: ["string", "null"]
+        year:
+          type: integer
+        fuelType:
+          type: string
+          enum: [petrol, diesel, electric, hybrid, phev, hydrogen, lpg, other]
+        transmission:
+          type: ["string", "null"]
+          enum: [manual, automatic, cvt, dct, other, null]
+        driveType:
+          type: ["string", "null"]
+          enum: [fwd, rwd, awd, 4wd, null]
+        engineSizeL:
+          type: ["string", "null"]
+        batteryCapacityKwh:
+          type: ["string", "null"]
+        rangeKm:
+          type: ["integer", "null"]
+        exteriorColor:
+          type: ["string", "null"]
+        interiorColor:
+          type: ["string", "null"]
+        mileageKm:
+          type: integer
+          default: 0
+        condition:
+          type: string
+          enum: [new, used, certified_used]
+          default: new
+        vin:
+          type: ["string", "null"]
+        originPortId:
+          type: ["string", "null"]
+        quantity:
+          type: integer
+          default: 1
+        fobPriceUsd:
+          type: string
+        description:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    UpdateVehicleInput:
+      type: object
+      properties:
+        brandId:
+          type: ["string", "null"]
+        brandName:
+          type: ["string", "null"]
+        modelId:
+          type: ["string", "null"]
+        modelName:
+          type: ["string", "null"]
+        trim:
+          type: ["string", "null"]
+        year:
+          type: ["integer", "null"]
+        fuelType:
+          type: ["string", "null"]
+          enum: [petrol, diesel, electric, hybrid, phev, hydrogen, lpg, other, null]
+        transmission:
+          type: ["string", "null"]
+          enum: [manual, automatic, cvt, dct, other, null]
+        driveType:
+          type: ["string", "null"]
+          enum: [fwd, rwd, awd, 4wd, null]
+        engineSizeL:
+          type: ["string", "null"]
+        batteryCapacityKwh:
+          type: ["string", "null"]
+        rangeKm:
+          type: ["integer", "null"]
+        exteriorColor:
+          type: ["string", "null"]
+        interiorColor:
+          type: ["string", "null"]
+        mileageKm:
+          type: ["integer", "null"]
+        condition:
+          type: ["string", "null"]
+          enum: [new, used, certified_used, null]
+        vin:
+          type: ["string", "null"]
+        originPortId:
+          type: ["string", "null"]
+        quantity:
+          type: ["integer", "null"]
+        fobPriceUsd:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    SellerDashboard:
+      type: object
+      required: [totalListings, draftCount, pendingCount, publishedCount, rejectedCount, archivedCount, totalViews, recentListings]
+      properties:
+        totalListings:
+          type: integer
+        draftCount:
+          type: integer
+        pendingCount:
+          type: integer
+        publishedCount:
+          type: integer
+        rejectedCount:
+          type: integer
+        archivedCount:
+          type: integer
+        totalViews:
+          type: integer
+        recentListings:
+          type: array
+          items:
+            $ref: "#/components/schemas/VehicleSummary"
+
+    # ── Favorites ────────────────────────────────────────────────────────────
+
+    FavoriteItem:
+      type: object
+      required: [id, vehicleId, createdAt, vehicle]
+      properties:
+        id:
+          type: string
+        vehicleId:
+          type: string
+        createdAt:
+          type: string
+        vehicle:
+          $ref: "#/components/schemas/VehicleSummary"
+
+    FavoritesListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FavoriteItem"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    ToggleFavoriteResponse:
+      type: object
+      required: [isFavorited, vehicleId]
+      properties:
+        isFavorited:
+          type: boolean
+        vehicleId:
+          type: string
+
+    # ── Chat ─────────────────────────────────────────────────────────────────
+
+    ConversationSummary:
+      type: object
+      required: [id, vehicleId, buyerId, sellerId, lastMessageAt, createdAt]
+      properties:
+        id:
+          type: string
+        vehicleId:
+          type: ["string", "null"]
+        buyerId:
+          type: string
+        sellerId:
+          type: string
+        buyerName:
+          type: ["string", "null"]
+        sellerName:
+          type: ["string", "null"]
+        vehicleTitle:
+          type: ["string", "null"]
+        vehiclePrimaryImageUrl:
+          type: ["string", "null"]
+        lastMessageAt:
+          type: string
+        lastMessagePreview:
+          type: ["string", "null"]
+        unreadCount:
+          type: integer
+        createdAt:
+          type: string
+
+    ConversationListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationSummary"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreateConversationInput:
+      type: object
+      required: [vehicleId, message]
+      properties:
+        vehicleId:
+          type: string
+        message:
+          type: string
+          description: Initial message to start the conversation
+
+    MessageAttachment:
+      type: object
+      required: [id, type, url, createdAt]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [image, document, video]
+        url:
+          type: string
+        filename:
+          type: ["string", "null"]
+        sizeBytes:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    ChatMessage:
+      type: object
+      required: [id, conversationId, senderId, body, messageType, createdAt]
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        senderId:
+          type: string
+        senderName:
+          type: ["string", "null"]
+        senderRole:
+          type: ["string", "null"]
+        body:
+          type: string
+        messageType:
+          type: string
+          enum: [text, quotation]
+        quotationId:
+          type: ["string", "null"]
+        quotation:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/QuotationSummary"
+        readAt:
+          type: ["string", "null"]
+        wasScrubbedAt:
+          type: ["string", "null"]
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageAttachment"
+        createdAt:
+          type: string
+
+    ConversationDetail:
+      allOf:
+        - $ref: "#/components/schemas/ConversationSummary"
+        - type: object
+          properties:
+            messages:
+              type: array
+              items:
+                $ref: "#/components/schemas/ChatMessage"
+            total:
+              type: integer
+            page:
+              type: integer
+            limit:
+              type: integer
+
+    # ── Notifications ─────────────────────────────────────────────────────────
+
+    NotificationItem:
+      type: object
+      required: [id, type, title, body, isRead, createdAt]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [new_message, new_inquiry, listing_approved, listing_rejected, order_update]
+        title:
+          type: string
+        body:
+          type: string
+        conversationId:
+          type: ["string", "null"]
+        vehicleId:
+          type: ["string", "null"]
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+
+    NotificationListResponse:
+      type: object
+      required: [data, total, unreadCount, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationItem"
+        total:
+          type: integer
+        unreadCount:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    # ── Buyer Dashboard ───────────────────────────────────────────────────────
+
+    BuyerDashboard:
+      type: object
+      required: [favoritesCount, activeConversations, unreadMessages, unreadNotifications]
+      properties:
+        favoritesCount:
+          type: integer
+        activeConversations:
+          type: integer
+        unreadMessages:
+          type: integer
+        unreadNotifications:
+          type: integer
+        recentFavorites:
+          type: array
+          items:
+            $ref: "#/components/schemas/VehicleSummary"
+        recentConversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationSummary"
+
+    # ── Quotation & Order Schemas ──────────────────────────────────────────────
+
+    QuotationStatus:
+      type: string
+      enum: [pending, accepted, rejected, expired]
+
+    OrderStatus:
+      type: string
+      enum: [inquiry, quotation_sent, quotation_accepted, awaiting_payment, payment_received, payment_verified, seller_payment, documents_preparation, booking_shipping, in_production, ready_to_ship, shipped, arrived, delivered, closed, cancelled]
+
+    SendConversationQuotationInput:
+      type: object
+      required: [quantity, unitPriceUsd, expiresAt]
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+        unitPriceUsd:
+          type: number
+        shippingFeeUsd:
+          type: number
+          nullable: true
+        inspectionFeeUsd:
+          type: number
+          nullable: true
+        otherFeesUsd:
+          type: number
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+
+    CreateQuotationInput:
+      type: object
+      required: [vehicleId, buyerId, quantity, unitPriceUsd, expiresAt]
+      properties:
+        vehicleId:
+          type: string
+        buyerId:
+          type: string
+        conversationId:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        unitPriceUsd:
+          type: number
+        shippingFeeUsd:
+          type: number
+        inspectionFeeUsd:
+          type: number
+        otherFeesUsd:
+          type: number
+        notes:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+
+    QuotationSummary:
+      type: object
+      required: [id, status, vehicleId, buyerId, sellerId, quantity, unitPriceUsd, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+          nullable: true
+        orderId:
+          type: string
+          nullable: true
+          description: ID of the linked order, present when the quotation has been accepted
+        vehicleId:
+          type: string
+        vehicleTitle:
+          type: string
+          nullable: true
+        vehicleBrand:
+          type: string
+          nullable: true
+        buyerId:
+          type: string
+        buyerName:
+          type: string
+          nullable: true
+        sellerId:
+          type: string
+        sellerName:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+        unitPriceUsd:
+          type: number
+        shippingFeeUsd:
+          type: number
+          nullable: true
+        inspectionFeeUsd:
+          type: number
+          nullable: true
+        otherFeesUsd:
+          type: number
+          nullable: true
+        totalAmountUsd:
+          type: number
+        notes:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/QuotationStatus"
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        commissionRuleId:
+          type: string
+          format: uuid
+          nullable: true
+        commissionType:
+          type: string
+          nullable: true
+        commissionValue:
+          type: number
+          nullable: true
+        commissionAmountUsd:
+          type: number
+          nullable: true
+        fobTotalUsd:
+          type: number
+          nullable: true
+          description: "FOB sub-total before commission. Returned to admin roles only."
+
+    QuotationListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuotationSummary"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    OrderStatusHistoryEntry:
+      type: object
+      required: [id, orderId, toStatus, changedById, createdAt]
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        fromStatus:
+          $ref: "#/components/schemas/OrderStatus"
+          nullable: true
+        toStatus:
+          $ref: "#/components/schemas/OrderStatus"
+        changedById:
+          type: string
+        changedByName:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    OrderSummary:
+      type: object
+      required: [id, orderNumber, status, vehicleId, buyerId, sellerId, quantity, unitPriceUsd, totalAmountUsd, createdAt]
+      properties:
+        id:
+          type: string
+        orderNumber:
+          type: string
+        quotationId:
+          type: string
+          nullable: true
+        vehicleId:
+          type: string
+        vehicleTitle:
+          type: string
+          nullable: true
+        vehiclePrimaryImage:
+          type: string
+          nullable: true
+        buyerId:
+          type: string
+        buyerName:
+          type: string
+          nullable: true
+        sellerId:
+          type: string
+        sellerName:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+        unitPriceUsd:
+          type: number
+        shippingFeeUsd:
+          type: number
+          nullable: true
+        inspectionFeeUsd:
+          type: number
+          nullable: true
+        otherFeesUsd:
+          type: number
+          nullable: true
+        totalAmountUsd:
+          type: number
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        commissionRuleId:
+          type: string
+          format: uuid
+          nullable: true
+        commissionType:
+          type: string
+          nullable: true
+        commissionValue:
+          type: number
+          nullable: true
+        commissionAmountUsd:
+          type: number
+          nullable: true
+        fobTotalUsd:
+          type: number
+          nullable: true
+          description: "FOB sub-total before commission. Returned to admin roles only."
+
+    OrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/OrderSummary"
+        - type: object
+          properties:
+            statusHistory:
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderStatusHistoryEntry"
+
+    OrderListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderSummary"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    UpdateOrderStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        note:
+          type: string
+
+    # ── Storage Schemas ────────────────────────────────────────────────────────
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+
+    # ── Payment Schemas ────────────────────────────────────────────────────────
+
+    PaymentStatus:
+      type: string
+      enum: [pending_review, verified, rejected]
+
+    SubmitPaymentInput:
+      type: object
+      required: [referenceNumber, bankName, paymentDate, amount]
+      properties:
+        referenceNumber:
+          type: string
+        bankName:
+          type: string
+        paymentDate:
+          type: string
+          format: date
+        amount:
+          type: number
+        currency:
+          type: string
+          default: USD
+        receiptObjectPath:
+          type: string
+          nullable: true
+        proofObjectPath:
+          type: string
+          nullable: true
+
+    PaymentRecord:
+      type: object
+      required: [id, orderId, submittedById, referenceNumber, bankName, paymentDate, amount, currency, status, createdAt]
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        submittedById:
+          type: string
+        submittedByName:
+          type: string
+          nullable: true
+        referenceNumber:
+          type: string
+        bankName:
+          type: string
+        paymentDate:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        receiptObjectPath:
+          type: string
+          nullable: true
+        proofObjectPath:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
+        verifiedById:
+          type: string
+          nullable: true
+        verifiedByName:
+          type: string
+          nullable: true
+        verifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        rejectionNote:
+          type: string
+          nullable: true
+        orderStatus:
+          $ref: "#/components/schemas/OrderStatus"
+        vehicleTitle:
+          type: string
+          nullable: true
+        buyerName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaymentListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentRecord"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    PaymentActionInput:
+      type: object
+      properties:
+        note:
+          type: string
+
+    # ── Freight Forwarder ──────────────────────────────────────────────────────
+
+    FreightRequestStatus:
+      type: string
+      enum: [open, quote_accepted, completed, cancelled]
+
+    ShippingQuoteStatus:
+      type: string
+      enum: [pending, accepted, rejected]
+
+    FreightRequest:
+      type: object
+      required: [id, orderId, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        status:
+          $ref: "#/components/schemas/FreightRequestStatus"
+        notes:
+          type: string
+          nullable: true
+        vehicleTitle:
+          type: string
+          nullable: true
+        buyerName:
+          type: string
+          nullable: true
+        sellerName:
+          type: string
+          nullable: true
+        orderTotalUsd:
+          type: number
+          nullable: true
+        quoteCount:
+          type: integer
+        myQuoteId:
+          type: string
+          nullable: true
+        myQuoteStatus:
+          $ref: "#/components/schemas/ShippingQuoteStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FreightRequestListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FreightRequest"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    ShippingQuote:
+      type: object
+      required: [id, freightRequestId, orderId, forwarderId, freightCostUsd, totalUsd, currency, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        freightRequestId:
+          type: string
+        orderId:
+          type: string
+        forwarderId:
+          type: string
+        forwarderName:
+          type: string
+          nullable: true
+        freightCostUsd:
+          type: number
+        insuranceUsd:
+          type: number
+        customsUsd:
+          type: number
+        portChargesUsd:
+          type: number
+        documentationUsd:
+          type: number
+        totalUsd:
+          type: number
+        currency:
+          type: string
+        estimatedDaysMin:
+          type: integer
+          nullable: true
+        estimatedDaysMax:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ShippingQuoteStatus"
+        acceptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        rejectedAt:
+          type: string
+          format: date-time
+          nullable: true
+        rejectionNote:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ShippingQuoteListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShippingQuote"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    SubmitShippingQuoteInput:
+      type: object
+      required: [freightCostUsd, totalUsd]
+      properties:
+        freightCostUsd:
+          type: number
+        insuranceUsd:
+          type: number
+          default: 0
+        customsUsd:
+          type: number
+          default: 0
+        portChargesUsd:
+          type: number
+          default: 0
+        documentationUsd:
+          type: number
+          default: 0
+        totalUsd:
+          type: number
+        currency:
+          type: string
+          default: USD
+        estimatedDaysMin:
+          type: integer
+          nullable: true
+        estimatedDaysMax:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+
+    RejectShippingQuoteInput:
+      type: object
+      properties:
+        note:
+          type: string
+          nullable: true
+
+    # ── Shipment Schemas ────────────────────────────────────────────────────────
+
+    ShipmentStatus:
+      type: string
+      enum: [awaiting_quote, quote_submitted, quote_accepted, container_booked, vehicle_collected, at_origin_port, loaded_on_vessel, in_transit, arrived_destination_port, customs_clearance, delivered]
+
+    ShippingDocumentType:
+      type: string
+      enum: [bill_of_lading, commercial_invoice, packing_list, insurance_certificate, export_declaration, arrival_notice]
+
+    ShipmentSummary:
+      type: object
+      required: [id, orderId, forwarderId, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        freightRequestId:
+          type: string
+          nullable: true
+        forwarderId:
+          type: string
+        forwarderName:
+          type: string
+          nullable: true
+        vehicleTitle:
+          type: string
+          nullable: true
+        buyerName:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ShipmentStatus"
+        notes:
+          type: string
+          nullable: true
+        documentCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ShipmentTrackingEvent:
+      type: object
+      required: [id, shipmentId, status, actorId, createdAt]
+      properties:
+        id:
+          type: string
+        shipmentId:
+          type: string
+        status:
+          $ref: "#/components/schemas/ShipmentStatus"
+        actorId:
+          type: string
+        actorName:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ShipmentDetail:
+      type: object
+      required: [id, orderId, forwarderId, status, tracking, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        freightRequestId:
+          type: string
+          nullable: true
+        forwarderId:
+          type: string
+        forwarderName:
+          type: string
+          nullable: true
+        vehicleTitle:
+          type: string
+          nullable: true
+        buyerName:
+          type: string
+          nullable: true
+        sellerName:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ShipmentStatus"
+        notes:
+          type: string
+          nullable: true
+        tracking:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShipmentTrackingEvent"
+        documentCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ShipmentListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShipmentSummary"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    ShipmentTrackingListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShipmentTrackingEvent"
+
+    ShipmentDocument:
+      type: object
+      required: [id, shipmentId, documentType, objectPath, fileName, uploadedById, visibleToBuyer, visibleToSeller, createdAt]
+      properties:
+        id:
+          type: string
+        shipmentId:
+          type: string
+        documentType:
+          $ref: "#/components/schemas/ShippingDocumentType"
+        objectPath:
+          type: string
+        fileName:
+          type: string
+        uploadedById:
+          type: string
+        uploaderName:
+          type: string
+          nullable: true
+        visibleToBuyer:
+          type: boolean
+        visibleToSeller:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    UpdateShipmentStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/ShipmentStatus"
+        note:
+          type: string
+          nullable: true
+
+    UploadShipmentDocumentInput:
+      type: object
+      required: [documentType, objectPath, fileName]
+      properties:
+        documentType:
+          $ref: "#/components/schemas/ShippingDocumentType"
+        objectPath:
+          type: string
+        fileName:
+          type: string
+        visibleToBuyer:
+          type: boolean
+          default: true
+        visibleToSeller:
+          type: boolean
+          default: false
+
+    # ── Freight Conversation Schemas ─────────────────────────────────────────────
+
+    FreightConversation:
+      type: object
+      required: [id, orderId, sellerId, forwarderId, sellerUnread, forwarderUnread, lastMessageAt, createdAt]
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        freightRequestId:
+          type: string
+          nullable: true
+        sellerId:
+          type: string
+        sellerName:
+          type: string
+          nullable: true
+        forwarderId:
+          type: string
+        forwarderName:
+          type: string
+          nullable: true
+        sellerUnread:
+          type: integer
+        forwarderUnread:
+          type: integer
+        lastMessageAt:
+          type: string
+          format: date-time
+        lastMessagePreview:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    FreightMessage:
+      type: object
+      required: [id, conversationId, senderId, body, createdAt]
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        senderId:
+          type: string
+        senderName:
+          type: string
+          nullable: true
+        body:
+          type: string
+        wasScrubbedAt:
+          type: string
+          format: date-time
+          nullable: true
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    FreightMessageListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FreightMessage"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreateFreightConversationInput:
+      type: object
+      required: [orderId, forwarderId]
+      properties:
+        orderId:
+          type: string
+        forwarderId:
+          type: string
+        freightRequestId:
+          type: string
+          nullable: true
+
+    SendFreightMessageBody:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+
+    # ── Admin Schemas ─────────────────────────────────────────────────────────
+
+    AdminStats:
+      type: object
+      required: [totalUsers, totalVehicles, totalOrders, totalRevenue, pendingModeration, pendingPayments, activeShipments, commissionRevenue, commissionTotal, shippingRevenue, conversionRate, ordersByStatus, revenueByMonth, topBrands, topCountries, usersByRole]
+      properties:
+        totalUsers:
+          type: integer
+        totalVehicles:
+          type: integer
+        totalOrders:
+          type: integer
+        totalRevenue:
+          type: number
+        pendingModeration:
+          type: integer
+        pendingPayments:
+          type: integer
+        activeShipments:
+          type: integer
+        commissionRevenue:
+          type: number
+        commissionTotal:
+          type: number
+          description: Total commission amounts persisted on non-cancelled orders
+        shippingRevenue:
+          type: number
+          description: Estimated freight/shipping revenue (8% of shipped order values)
+        conversionRate:
+          type: number
+          description: Percentage of buyers who have placed at least one order
+        ordersByStatus:
+          type: array
+          items:
+            type: object
+            required: [status, count]
+            properties:
+              status:
+                type: string
+              count:
+                type: integer
+        revenueByMonth:
+          type: array
+          items:
+            type: object
+            required: [month, revenue, orders]
+            properties:
+              month:
+                type: string
+              revenue:
+                type: number
+              orders:
+                type: integer
+        topBrands:
+          type: array
+          items:
+            type: object
+            required: [brand, count]
+            properties:
+              brand:
+                type: string
+              count:
+                type: integer
+        topCountries:
+          type: array
+          items:
+            type: object
+            required: [country, count]
+            properties:
+              country:
+                type: string
+              count:
+                type: integer
+        usersByRole:
+          type: array
+          items:
+            type: object
+            required: [role, count]
+            properties:
+              role:
+                type: string
+              count:
+                type: integer
+
+    CommissionRule:
+      type: object
+      required: [id, name, type, scope, priority, isActive, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [fixed, percentage, hybrid]
+        scope:
+          type: string
+          enum: [default, seller, country, category]
+        scopeValue:
+          type: string
+          nullable: true
+        fixedAmountUsd:
+          type: number
+          nullable: true
+        percentageRate:
+          type: number
+          nullable: true
+        priority:
+          type: integer
+        isActive:
+          type: boolean
+        createdById:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CommissionRuleListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommissionRule"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreateCommissionRuleInput:
+      type: object
+      required: [name, type, scope]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [fixed, percentage, hybrid]
+        scope:
+          type: string
+          enum: [default, seller, country, category]
+        scopeValue:
+          type: string
+          nullable: true
+        fixedAmountUsd:
+          type: number
+          nullable: true
+        percentageRate:
+          type: number
+          nullable: true
+        priority:
+          type: integer
+          default: 0
+        isActive:
+          type: boolean
+          default: true
+
+    UpdateCommissionRuleInput:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [fixed, percentage, hybrid]
+        scope:
+          type: string
+          enum: [default, seller, country, category]
+        scopeValue:
+          type: string
+          nullable: true
+        fixedAmountUsd:
+          type: number
+          nullable: true
+        percentageRate:
+          type: number
+          nullable: true
+        priority:
+          type: integer
+        isActive:
+          type: boolean
+
+    AuditLogEntry:
+      type: object
+      required: [id, action, module, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+          nullable: true
+        userEmail:
+          type: string
+          nullable: true
+        action:
+          type: string
+        module:
+          type: string
+        details:
+          type: string
+          nullable: true
+        ipAddress:
+          type: string
+          nullable: true
+        userAgent:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AuditLogListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogEntry"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    ReferenceCountry:
+      type: object
+      required: [id, name, code]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        isActive: { type: boolean }
+
+    ReferencePort:
+      type: object
+      required: [id, name, code]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        countryId: { type: string, nullable: true }
+        isActive: { type: boolean }
+
+    ReferenceCurrency:
+      type: object
+      required: [id, name, code, symbol]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        symbol: { type: string }
+        isActive: { type: boolean }
+
+    SettingEntry:
+      type: object
+      required: [id, key, value, updatedAt]
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        value:
+          type: string
+        description:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+
+    SettingUpdateInput:
+      type: object
+      required: [value]
+      properties:
+        value:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    AdminListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserProfile"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreateAdminInput:
+      type: object
+      required: [email, firstName, lastName, password]
+      properties:
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        department:
+          type: string
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: string
+          description: List of permission names to assign
+
+    UpdateAdminPermissionsInput:
+      type: object
+      properties:
+        permissions:
+          type: array
+          items:
+            type: string
+          description: Full replacement list of permission names
+        department:
+          type: string
+          nullable: true
+
+    ApproveVehicleInput:
+      type: object
+      properties:
+        notes:
+          type: string
+          nullable: true
+
+    RejectVehicleInput:
+      type: object
+      required: [rejectionReason]
+      properties:
+        rejectionReason:
+          type: string
+
